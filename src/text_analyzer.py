@@ -2,12 +2,14 @@ import re
 from langdetect import detect
 from transformers import pipeline
 from keybert import KeyBERT
+from ontology_handler import OntologyHandler
 
 class TextAnalyzer:
     def __init__(self):
         self.summarizer = pipeline("summarization")
         self.keyword_extractor = KeyBERT()
-
+        self.ontology_handler = OntologyHandler()
+    
     def detect_language(self, text):
         try:
             return detect(text)
@@ -29,7 +31,9 @@ class TextAnalyzer:
 
         try:
             for chunk in text_chunks:
-                summary = self.summarizer(chunk, max_length=max_length, min_length=30, do_sample=False)
+                # Проверка длины текста для корректной суммаризации
+                adjusted_max_length = min(max_length, len(chunk) // 2)  # Уменьшаем max_length, если текст слишком короткий
+                summary = self.summarizer(chunk, max_length=adjusted_max_length , min_length=30, do_sample=False)
                 if summary and len(summary) > 0:
                     clean_summary = self.clean_text(summary[0]['summary_text'])  # Очистка итогового текста
                     summarized_text.append(clean_summary)
@@ -44,3 +48,12 @@ class TextAnalyzer:
             return [kw[0] for kw in keywords if kw]
         except Exception as e:
             return [f"Ошибка при извлечении ключевых слов: {e}"]
+        
+    def process_ontology(self, keywords):
+        """
+        Создание графа онтологии, генерация формулы и сохранение.
+        """
+        graph = self.ontology_handler.build_ontology(keywords)
+        formula = self.ontology_handler.export_ontology_formula(graph)
+        self.ontology_handler.save_ontology(graph, formula)
+        return graph, formula
